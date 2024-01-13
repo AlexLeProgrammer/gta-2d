@@ -1,5 +1,6 @@
 [
   {
+    "name" : "city-car",
     "width" : 50,
     "height" : 80,
     "maxSpeed" : 10,
@@ -38,6 +39,7 @@
     ]
   },
   {
+    "name" : "fast-car",
     "width" : 50,
     "height" : 100,
     "maxSpeed" : 15,
