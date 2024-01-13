@@ -5,16 +5,13 @@
 
 "use strict";
 
-// Imports
+//#region Constants
 
 // Get the map from map.json
-import mapJson from "./map.json" assert {type: "json"};
+const MAP = await fetch('json/map.json').then((response) => response.json());
 
 // Get the car models from car_models.json
-import carModelsJson from "./car_models.json" assert {type: "json"};
-
-
-//#region Constants
+const CAR_MODELS = await fetch('json/car_models.json').then((response) => response.json());
 
 // Get the canvas
 const CANVAS = document.querySelector("canvas");
@@ -74,13 +71,13 @@ class Car {
         this.rotation = rotation;
 
         // Get data from the selected model
-        this.width = carModelsJson[modelIndex].width;
-        this.height = carModelsJson[modelIndex].height;
-        this.maxSpeed = carModelsJson[modelIndex].maxSpeed;
-        this.frameToMaxSpeed = carModelsJson[modelIndex].frameToMaxSpeed;
-        this.frameToStop = carModelsJson[modelIndex].frameToStop;
-        this.rotationSpeed = carModelsJson[modelIndex].rotationSpeed;
-        this.texture = carModelsJson[modelIndex].texture;
+        this.width = CAR_MODELS[modelIndex].width;
+        this.height = CAR_MODELS[modelIndex].height;
+        this.maxSpeed = CAR_MODELS[modelIndex].maxSpeed;
+        this.frameToMaxSpeed = CAR_MODELS[modelIndex].frameToMaxSpeed;
+        this.frameToStop = CAR_MODELS[modelIndex].frameToStop;
+        this.rotationSpeed = CAR_MODELS[modelIndex].rotationSpeed;
+        this.texture = CAR_MODELS[modelIndex].texture;
     }
 }
 
@@ -136,7 +133,7 @@ function calculateDistance(x1, y1, x2, y2) {
  * Display all the elements in the range of the render distance.
  */
 function drawElementsInRange() {
-    for (let element of mapJson) {
+    for (let element of MAP) {
         if (calculateDistance(player.x, player.y, element.x, element.y) <= RENDER_DISTANCE) {
             // Get the texture of the element
             let color = "";
@@ -369,7 +366,7 @@ function tick() {
 //#endregion
 
 // Sort the map by the z-index of the elements
-mapJson.sort((a, b) => {
+MAP.sort((a, b) => {
     return a.z_index - b.z_index;
 });
 
