@@ -1,0 +1,78 @@
+[
+  {
+    "width" : 50,
+    "height" : 80,
+    "maxSpeed" : 10,
+    "frameToMaxSpeed" : 500,
+    "frameToStop" : 2000,
+    "rotationSpeed" : 5,
+    "texture" : [
+      {
+        "x" : -5,
+        "y" : 10,
+        "width" : 60,
+        "height" : 20,
+        "color" : "black"
+      },
+      {
+        "x" : -5,
+        "y" : 50,
+        "width" : 60,
+        "height" : 20,
+        "color" : "black"
+      },
+      {
+        "x" : 0,
+        "y" : 0,
+        "width" : 50,
+        "height" : 80,
+        "color" : "black"
+      },
+      {
+        "x" : 5,
+        "y" : 5,
+        "width" : 40,
+        "height" : 20,
+        "color" : "skyblue"
+      }
+    ]
+  },
+  {
+    "width" : 50,
+    "height" : 100,
+    "maxSpeed" : 15,
+    "frameToMaxSpeed" : 500,
+    "frameToStop" : 2000,
+    "rotationSpeed" : 2,
+    "texture" : [
+      {
+        "x" : -5,
+        "y" : 10,
+        "width" : 60,
+        "height" : 20,
+        "color" : "black"
+      },
+      {
+        "x" : -5,
+        "y" : 70,
+        "width" : 60,
+        "height" : 20,
+        "color" : "black"
+      },
+      {
+        "x" : 0,
+        "y" : 0,
+        "width" : 50,
+        "height" : 100,
+        "color" : "red"
+      },
+      {
+        "x" : 5,
+        "y" : 5,
+        "width" : 40,
+        "height" : 20,
+        "color" : "skyblue"
+      }
+    ]
+  }
+]

@@ -5,6 +5,15 @@
 
 "use strict";
 
+// Imports
+
+// Get the map from map.json
+import mapJson from "./map.json" assert {type: "json"};
+
+// Get the car models from car_models.json
+import carModelsJson from "./car_models.json" assert {type: "json"};
+
+
 //#region Constants
 
 // Get the canvas
@@ -47,38 +56,37 @@ class Player {
  * Represent a car.
  */
 class Car {
-    x = 0;
-    y = 0;
+    x;
+    y;
+    rotation; // Degrees
+    speed = 0;
     width;
     height;
-    rotation; // Degrees
-    color;
     maxSpeed;
     frameToMaxSpeed;
     frameToStop;
     rotationSpeed; // Degrees / frame
+    texture;
 
-    constructor(x = 0, y = 0, rotation = 0, color = "black", width = 50, height = 100,
-                maxSpeed = 10, frameToMaxSpeed = 100, frameToStop = 50, rotationSpeed = 5) {
+    constructor(x = 0, y = 0, rotation = 0, modelIndex = null) {
         this.x = x;
         this.y = y;
         this.rotation = rotation;
-        this.color = color;
-        this.width = width;
-        this.height = height;
-        this.maxSpeed = maxSpeed;
-        this.frameToMaxSpeed = frameToMaxSpeed;
-        this.frameToStop = frameToStop;
-        this.rotationSpeed = rotationSpeed;
+
+        // Get data from the selected model
+        this.width = carModelsJson[modelIndex].width;
+        this.height = carModelsJson[modelIndex].height;
+        this.maxSpeed = carModelsJson[modelIndex].maxSpeed;
+        this.frameToMaxSpeed = carModelsJson[modelIndex].frameToMaxSpeed;
+        this.frameToStop = carModelsJson[modelIndex].frameToStop;
+        this.rotationSpeed = carModelsJson[modelIndex].rotationSpeed;
+        this.texture = carModelsJson[modelIndex].texture;
     }
 }
 
 //#endregion
 
 //#region Global-variables
-
-// Get the map from map.json
-import mapJson from "./map.json" assert {type: "json"};
 
 // Player
 let player = new Player();
@@ -104,8 +112,8 @@ let lastTick = performance.now();
 
 // Cars
 let cars = [
-    new Car(300, 0, 0, "black"),
-    new Car(300, 200, 0, "greenyellow")
+    new Car(300, 0, 0, 0),
+    new Car(300, 200, 0, 1)
 ];
 
 //#endregion
@@ -128,9 +136,7 @@ function calculateDistance(x1, y1, x2, y2) {
  * Display all the elements in the range of the render distance.
  */
 function drawElementsInRange() {
-    // Get the elements in range
-    let elementsInRange = [];
-    for (let element of mapJson.elements) {
+    for (let element of mapJson) {
         if (calculateDistance(player.x, player.y, element.x, element.y) <= RENDER_DISTANCE) {
             // Get the texture of the element
             let color = "";
@@ -168,38 +174,39 @@ function drawPlayer() {
  */
 function movePlayer() {
     // Left
-    if (leftPressed && playerHorizontalSpeed > -PLAYER_MAX_SPEED) {
+    if (leftPressed && !rightPressed && playerHorizontalSpeed > -PLAYER_MAX_SPEED) {
         playerHorizontalSpeed -= PLAYER_MAX_SPEED / PLAYER_FRAME_TO_MAX_SPEED;
     }
 
     // Right
-    if (rightPressed && playerHorizontalSpeed < PLAYER_MAX_SPEED) {
+    if (rightPressed && !leftPressed && playerHorizontalSpeed < PLAYER_MAX_SPEED) {
         playerHorizontalSpeed += PLAYER_MAX_SPEED / PLAYER_FRAME_TO_MAX_SPEED;
     }
 
     // Forward
-    if (forwardPressed && playerVerticalSpeed > -PLAYER_MAX_SPEED) {
+    if (forwardPressed && !backwardPressed && playerVerticalSpeed > -PLAYER_MAX_SPEED) {
         playerVerticalSpeed -= PLAYER_MAX_SPEED / PLAYER_FRAME_TO_MAX_SPEED;
     }
 
     // Backward
-    if (backwardPressed && playerVerticalSpeed < PLAYER_MAX_SPEED) {
+    if (backwardPressed && !forwardPressed && playerVerticalSpeed < PLAYER_MAX_SPEED) {
         playerVerticalSpeed += PLAYER_MAX_SPEED / PLAYER_FRAME_TO_MAX_SPEED;
     }
 
     // When we don't move, reduce speed
-    if ((!leftPressed && !rightPressed && !forwardPressed && !backwardPressed) ||
-        (leftPressed && rightPressed) || (forwardPressed && backwardPressed)) {
-        // Horizontal
-        if (!forwardPressed && Math.abs(playerHorizontalSpeed) < PLAYER_MAX_SPEED / PLAYER_FRAME_TO_MAX_SPEED) {
+    // Horizontal
+    if ((leftPressed && rightPressed) || (!leftPressed && !rightPressed)) {
+        if (Math.abs(playerHorizontalSpeed) < PLAYER_MAX_SPEED / PLAYER_FRAME_TO_STOP) {
             playerHorizontalSpeed = 0;
         } else {
             playerHorizontalSpeed += PLAYER_MAX_SPEED /
                 PLAYER_FRAME_TO_STOP * (playerHorizontalSpeed > 0 ? -1 : 1);
         }
+    }
 
-        // Vertical
-        if (!leftPressed && Math.abs(playerVerticalSpeed) < PLAYER_MAX_SPEED / PLAYER_FRAME_TO_MAX_SPEED) {
+    // Vertical
+    if ((forwardPressed && backwardPressed) || (!forwardPressed && !backwardPressed)) {
+        if (Math.abs(playerVerticalSpeed) < PLAYER_MAX_SPEED / PLAYER_FRAME_TO_STOP) {
             playerVerticalSpeed = 0;
         } else {
             playerVerticalSpeed += PLAYER_MAX_SPEED /
@@ -207,6 +214,7 @@ function movePlayer() {
         }
     }
 
+    // Apply the forces to the player
     player.x += playerHorizontalSpeed * deltaTime;
     player.y += playerVerticalSpeed * deltaTime;
 }
@@ -217,20 +225,29 @@ function movePlayer() {
 function drawCarsInRange() {
     for (let car of cars) {
         if (calculateDistance(player.x, player.y, car.x, car.y) <= RENDER_DISTANCE) {
-            CTX.fillStyle = car.color;
             if (car.rotation !== 0) {
-                // Rotate the car
+                // Rotate / translate the canvas
                 CTX.translate(-cameraX, -cameraY);
                 CTX.translate(car.x + car.width / 2, car.y + car.height / 2);
                 CTX.rotate(car.rotation * Math.PI / 180);
                 CTX.translate(-(car.x + car.width / 2), -(car.y + car.height / 2));
-                CTX.fillRect(car.x, car.y, car.width, car.height);
+
+                // Draw the car
+                for (let rectangle of car.texture) {
+                    CTX.fillStyle = rectangle.color;
+                    CTX.fillRect(car.x + rectangle.x, car.y + rectangle.y, rectangle.width, rectangle.height);
+                }
+
+                // Restore the canvas to the initial position / rotation
                 CTX.translate(car.x + car.width / 2, car.y + car.height / 2);
                 CTX.rotate(-car.rotation * Math.PI / 180);
                 CTX.translate(-(car.x + car.width / 2), -(car.y + car.height / 2));
                 CTX.translate(cameraX, cameraY);
             } else {
-                CTX.fillRect(car.x - cameraX, car.y - cameraY, car.width, car.height);
+                for (let rectangle of car.texture) {
+                    CTX.fillStyle = rectangle.color;
+                    CTX.fillRect(car.x + rectangle.x - cameraX, car.y + rectangle.y - cameraY, rectangle.width, rectangle.height);
+                }
             }
         }
     }
@@ -261,6 +278,52 @@ function getInTheNearestCar() {
     }
 }
 
+/**
+ * Move the player and the car that he is in.
+ */
+function driveCar() {
+    // Left
+    if (leftPressed && !rightPressed) {
+        cars[player.carDrivingIndex].rotation -= cars[player.carDrivingIndex].rotationSpeed * deltaTime;
+    }
+
+    // Right
+    if (rightPressed && !leftPressed) {
+        cars[player.carDrivingIndex].rotation += cars[player.carDrivingIndex].rotationSpeed * deltaTime;
+    }
+
+    // Forward
+    if (forwardPressed && !rightPressed && cars[player.carDrivingIndex].speed > -cars[player.carDrivingIndex].maxSpeed) {
+        cars[player.carDrivingIndex].speed -= cars[player.carDrivingIndex].maxSpeed / cars[player.carDrivingIndex].frameToMaxSpeed;
+    }
+
+    // Backward
+    if (backwardPressed && !forwardPressed && cars[player.carDrivingIndex].speed < cars[player.carDrivingIndex].maxSpeed) {
+        cars[player.carDrivingIndex].speed += cars[player.carDrivingIndex].maxSpeed / cars[player.carDrivingIndex].frameToMaxSpeed;
+    }
+
+    // When we don't move, reduce speed
+    // Vertical
+    if ((forwardPressed && backwardPressed) || (!forwardPressed && !backwardPressed)) {
+        if (Math.abs(cars[player.carDrivingIndex].speed) < cars[player.carDrivingIndex].maxSpeed / cars[player.carDrivingIndex].frameToStop) {
+            playerVerticalSpeed = 0;
+        } else {
+            cars[player.carDrivingIndex].speed += cars[player.carDrivingIndex].maxSpeed /
+                cars[player.carDrivingIndex].frameToStop * (cars[player.carDrivingIndex].speed > 0 ? -1 : 1);
+        }
+    }
+
+    // Apply the forces to the car
+    cars[player.carDrivingIndex].x -= Math.sin(cars[player.carDrivingIndex].rotation * Math.PI / 180) *
+        cars[player.carDrivingIndex].speed * deltaTime;
+    cars[player.carDrivingIndex].y += Math.cos(cars[player.carDrivingIndex].rotation * Math.PI / 180) *
+        cars[player.carDrivingIndex].speed * deltaTime;
+
+    // Teleport the player in the middle off the car
+    player.x = cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2 - PLAYER_WIDTH / 2;
+    player.y = cars[player.carDrivingIndex].y + cars[player.carDrivingIndex].height / 2 - PLAYER_HEIGHT / 2;
+}
+
 // Main function
 function tick() {
     // Delta-time
@@ -284,6 +347,7 @@ function tick() {
     if (interactKeyPressed && player.carDrivingIndex === -1) {
         getInTheNearestCar();
     } else if (interactKeyPressed) {
+        cars[player.carDrivingIndex].speed = 0;
         player.carDrivingIndex = -1;
     }
 
@@ -294,7 +358,8 @@ function tick() {
         // Draw the player if he isn't in a car
         drawPlayer();
     } else {
-        // TODO : driveCar()
+        // Drive the car of the player
+        driveCar();
     }
 
     // Reset interacting value
@@ -304,7 +369,7 @@ function tick() {
 //#endregion
 
 // Sort the map by the z-index of the elements
-mapJson.elements.sort((a, b) => {
+mapJson.sort((a, b) => {
     return a.z_index - b.z_index;
 });
 
