@@ -25,5 +25,14 @@
     "scale" : 1,
     "z_index" : 3,
     "type" : 3
+  },
+  {
+    "x" : -200,
+    "y" : 0,
+    "width" : 100,
+    "height" : 100,
+    "scale" : 1,
+    "z_index" : 1,
+    "type" : 201
   }
 ]

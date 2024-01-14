@@ -33,6 +33,14 @@ const RENDER_DISTANCE = 1000; // Maximal distance where elements are rendered
 // Delta-time
 const DEFAULT_FPS = 60;
 
+// Map
+
+// Types of map element bounds
+const MAP_TYPE_NO0COLLISIONS = [1, 200];
+const MAP_TYPE_COLLISIONS = [201, 400];
+const MAP_TYPE_AREA = [401, 600];
+const MAP_TYPE_ROAD = [601, 800];
+
 // Cars
 const CAR_RANGE = 50;
 
@@ -138,9 +146,13 @@ function drawElementsInRange() {
             // Get the texture of the element
             let color = "";
             switch (element.type) {
+                // No collisions
                 case 1: color = "gray"; break;
                 case 2: color = "saddlebrown"; break;
                 case 3: color = "green"; break;
+
+                // With collisions
+                case 201: color = "gray"; break;
             }
 
             // Display the element
@@ -212,6 +224,16 @@ function movePlayer() {
     }
 
     // Apply the forces to the player
+    let nearestWallDistanceX = playerHorizontalSpeed === 0 ? null : getNearestWallDistanceX(player.x, player.y,
+        PLAYER_WIDTH, PLAYER_HEIGHT, playerHorizontalSpeed > 0 ? 1 : -1);
+
+    if (nearestWallDistanceX !== null) {
+        console.log(nearestWallDistanceX, Math.abs(playerHorizontalSpeed * deltaTime));
+    }
+    if (nearestWallDistanceX !== null && Math.abs(playerHorizontalSpeed * deltaTime) > nearestWallDistanceX) {
+        playerHorizontalSpeed = 0;
+    }
+
     player.x += playerHorizontalSpeed * deltaTime;
     player.y += playerVerticalSpeed * deltaTime;
 }
@@ -319,6 +341,31 @@ function driveCar() {
     // Teleport the player in the middle off the car
     player.x = cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2 - PLAYER_WIDTH / 2;
     player.y = cars[player.carDrivingIndex].y + cars[player.carDrivingIndex].height / 2 - PLAYER_HEIGHT / 2;
+}
+
+/**
+ * Get the index of the nearest wall in the X axis.
+ * @param x Position of the rectangle in the X axis.
+ * @param y Position of the rectangle in the Y axis.
+ * @param width Width of the rectangle.
+ * @param height Height of the rectangle.
+ * @param direction The direction of the detection, -1 for left, 1 for right
+ */
+function getNearestWallDistanceX(x, y, width, height, direction) {
+    let minDist = null;
+    for (let i = 0; i < MAP.length; i++) {
+        if (MAP[i].type >= MAP_TYPE_COLLISIONS[0] && MAP[i].type <= MAP_TYPE_COLLISIONS[1]) {
+            if (direction === 1 && MAP[i].x >= x + width && y + height > MAP[i].y &&
+                y < MAP[i].y + MAP[i].height && (MAP[i].x - x - width < minDist || minDist === null)) {
+                minDist = MAP[i].x - x - width;
+            } else if (direction === -1 && MAP[i].x + MAP[i].width <= x && y + height > MAP[i].y &&
+                y < MAP[i].y + MAP[i].height && (MAP[i].x + MAP[i].width - x < minDist || minDist === null)) {
+                minDist = Math.abs(MAP[i].x + MAP[i].width - x);
+            }
+        }
+    }
+
+    return minDist === null ? null : minDist;
 }
 
 // Main function
