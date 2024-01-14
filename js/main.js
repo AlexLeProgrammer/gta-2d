@@ -21,7 +21,7 @@ const CTX = CANVAS.getContext("2d");
 const PLAYER_WIDTH = 50;
 const PLAYER_HEIGHT = 50;
 
-const PLAYER_MAX_SPEED = 3;
+const PLAYER_MAX_SPEED = 100000;
 const PLAYER_FRAME_TO_MAX_SPEED = 100;
 const PLAYER_FRAME_TO_STOP = 50;
 
@@ -223,19 +223,31 @@ function movePlayer() {
         }
     }
 
-    // Apply the forces to the player
-    let nearestWallDistanceX = playerHorizontalSpeed === 0 ? null : getNearestWallDistanceX(player.x, player.y,
-        PLAYER_WIDTH, PLAYER_HEIGHT, playerHorizontalSpeed > 0 ? 1 : -1);
 
-    if (nearestWallDistanceX !== null) {
-        console.log(nearestWallDistanceX, Math.abs(playerHorizontalSpeed * deltaTime));
-    }
+    // Modify forces if there is a wall and apply it to the player
+
+    // Horizontal
+    let nearestWallDistanceX = playerHorizontalSpeed === 0 ? null : getNearestWallDistance(player.x, player.y,
+        PLAYER_WIDTH, PLAYER_HEIGHT, playerHorizontalSpeed > 0 ? 1 : -1, false);
+
     if (nearestWallDistanceX !== null && Math.abs(playerHorizontalSpeed * deltaTime) > nearestWallDistanceX) {
         playerHorizontalSpeed = 0;
+        player.x += nearestWallDistanceX * (playerHorizontalSpeed > 0 ? 1 : -1);
+    } else {
+        // Apply the force to the player
+        player.x += playerHorizontalSpeed * deltaTime;
     }
 
-    player.x += playerHorizontalSpeed * deltaTime;
-    player.y += playerVerticalSpeed * deltaTime;
+    // Vertical
+    let nearestWallDistanceY = playerVerticalSpeed === 0 ? null : getNearestWallDistance(player.x, player.y,
+        PLAYER_WIDTH, PLAYER_HEIGHT, playerVerticalSpeed > 0 ? 1 : -1, true);
+
+    if (nearestWallDistanceY !== null && Math.abs(playerVerticalSpeed * deltaTime) > nearestWallDistanceY) {
+        playerVerticalSpeed = 0;
+    } else {
+        // Apply the force to the player
+        player.y += playerVerticalSpeed * deltaTime;
+    }
 }
 
 /**
@@ -349,18 +361,31 @@ function driveCar() {
  * @param y Position of the rectangle in the Y axis.
  * @param width Width of the rectangle.
  * @param height Height of the rectangle.
- * @param direction The direction of the detection, -1 for left, 1 for right
+ * @param direction The direction of the detection, -1 for left / forward, 1 for right / backward.
+ * @param axis The axis of detection, false : X, true : Y
  */
-function getNearestWallDistanceX(x, y, width, height, direction) {
+function getNearestWallDistance(x, y, width, height, direction, axis) {
     let minDist = null;
     for (let i = 0; i < MAP.length; i++) {
         if (MAP[i].type >= MAP_TYPE_COLLISIONS[0] && MAP[i].type <= MAP_TYPE_COLLISIONS[1]) {
-            if (direction === 1 && MAP[i].x >= x + width && y + height > MAP[i].y &&
-                y < MAP[i].y + MAP[i].height && (MAP[i].x - x - width < minDist || minDist === null)) {
-                minDist = MAP[i].x - x - width;
-            } else if (direction === -1 && MAP[i].x + MAP[i].width <= x && y + height > MAP[i].y &&
-                y < MAP[i].y + MAP[i].height && (MAP[i].x + MAP[i].width - x < minDist || minDist === null)) {
-                minDist = Math.abs(MAP[i].x + MAP[i].width - x);
+            if (axis) {
+                // Vertical
+                if (direction === 1 && MAP[i].y >= y + height && x + width > MAP[i].x &&
+                    x < MAP[i].x + MAP[i].width && (MAP[i].y - y - height < minDist || minDist === null)) {
+                    minDist = MAP[i].y - y - height;
+                } else if (direction === -1 && MAP[i].y + MAP[i].height <= y && x + width > MAP[i].x &&
+                    x < MAP[i].x + MAP[i].width && (MAP[i].y + MAP[i].height - y < minDist || minDist === null)) {
+                    minDist = Math.abs(MAP[i].y + MAP[i].height - y);
+                }
+            } else {
+                // Horizontal
+                if (direction === 1 && MAP[i].x >= x + width && y + height > MAP[i].y &&
+                    y < MAP[i].y + MAP[i].height && (MAP[i].x - x - width < minDist || minDist === null)) {
+                    minDist = MAP[i].x - x - width;
+                } else if (direction === -1 && MAP[i].x + MAP[i].width <= x && y + height > MAP[i].y &&
+                    y < MAP[i].y + MAP[i].height && (MAP[i].x + MAP[i].width - x < minDist || minDist === null)) {
+                    minDist = Math.abs(MAP[i].x + MAP[i].width - x);
+                }
             }
         }
     }
