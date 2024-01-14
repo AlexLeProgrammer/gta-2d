@@ -21,7 +21,7 @@ const CTX = CANVAS.getContext("2d");
 const PLAYER_WIDTH = 50;
 const PLAYER_HEIGHT = 50;
 
-const PLAYER_MAX_SPEED = 100000;
+const PLAYER_MAX_SPEED = 3;
 const PLAYER_FRAME_TO_MAX_SPEED = 100;
 const PLAYER_FRAME_TO_STOP = 50;
 
