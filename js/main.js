@@ -54,7 +54,7 @@ const CAR_RANGE = 50;
 class Player {
     x = 0;
     y = 0;
-    carDrivingIndex = -1; // -1 : no car
+    carDrivingIndex = 0; // -1 : no car
 }
 
 /**
@@ -131,10 +131,35 @@ let cars = [
  * @param y1 The location in the Y axis of the first point.
  * @param x2 The location in the X axis of the second point.
  * @param y2 The location in the Y axis of the second point.
- * @return The distance between the two point in parameters.
+ * @return {number} The distance between the two point in parameters.
  */
 function calculateDistance(x1, y1, x2, y2) {
     return Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2));
+}
+
+/**
+ * Convert degrees to radians.
+ * @param degrees Number of degrees.
+ * @return {number} The degrees in parameters converted in radians.
+ */
+function degToRad(degrees) {
+    return degrees * Math.PI / 180;
+}
+
+/**
+ * Rotate a point around another.
+ * @param x Coordinate of the point to rotate in the X axis.
+ * @param y Coordinate of the point to rotate in the Y axis.
+ * @param centerX Coordinate of the center in the X axis.
+ * @param centerY Coordinate of the center in the Y axis.
+ * @param rotation Degrees of the rotation.
+ * @return {number[]} The rotated point location.
+ */
+function getRotatedPoint(x, y, centerX, centerY, rotation) {
+    return [
+        (x - centerX) * Math.cos(degToRad(rotation)) - (y - centerY) * Math.sin(degToRad(rotation)) + centerX,
+        (x - centerX) * Math.sin(degToRad(rotation)) + (y - centerY) * Math.cos(degToRad(rotation)) + centerY
+    ];
 }
 
 /**
@@ -260,7 +285,7 @@ function drawCarsInRange() {
                 // Rotate / translate the canvas
                 CTX.translate(-cameraX, -cameraY);
                 CTX.translate(car.x + car.width / 2, car.y + car.height / 2);
-                CTX.rotate(car.rotation * Math.PI / 180);
+                CTX.rotate(degToRad(car.rotation));
                 CTX.translate(-(car.x + car.width / 2), -(car.y + car.height / 2));
 
                 // Draw the car
@@ -271,7 +296,7 @@ function drawCarsInRange() {
 
                 // Restore the canvas to the initial position / rotation
                 CTX.translate(car.x + car.width / 2, car.y + car.height / 2);
-                CTX.rotate(-car.rotation * Math.PI / 180);
+                CTX.rotate(-degToRad(car.rotation));
                 CTX.translate(-(car.x + car.width / 2), -(car.y + car.height / 2));
                 CTX.translate(cameraX, cameraY);
             } else {
@@ -314,12 +339,12 @@ function getInTheNearestCar() {
  */
 function driveCar() {
     // Left
-    if (leftPressed && !rightPressed) {
+    if (leftPressed && !rightPressed && cars[player.carDrivingIndex].speed !== 0) {
         cars[player.carDrivingIndex].rotation -= cars[player.carDrivingIndex].rotationSpeed * deltaTime;
     }
 
     // Right
-    if (rightPressed && !leftPressed) {
+    if (rightPressed && !leftPressed && cars[player.carDrivingIndex].speed !== 0) {
         cars[player.carDrivingIndex].rotation += cars[player.carDrivingIndex].rotationSpeed * deltaTime;
     }
 
@@ -337,18 +362,299 @@ function driveCar() {
     // Vertical
     if ((forwardPressed && backwardPressed) || (!forwardPressed && !backwardPressed)) {
         if (Math.abs(cars[player.carDrivingIndex].speed) < cars[player.carDrivingIndex].maxSpeed / cars[player.carDrivingIndex].frameToStop) {
-            playerVerticalSpeed = 0;
+            cars[player.carDrivingIndex].speed = 0;
         } else {
             cars[player.carDrivingIndex].speed += cars[player.carDrivingIndex].maxSpeed /
                 cars[player.carDrivingIndex].frameToStop * (cars[player.carDrivingIndex].speed > 0 ? -1 : 1);
         }
     }
 
-    // Apply the forces to the car
-    cars[player.carDrivingIndex].x -= Math.sin(cars[player.carDrivingIndex].rotation * Math.PI / 180) *
-        cars[player.carDrivingIndex].speed * deltaTime;
-    cars[player.carDrivingIndex].y += Math.cos(cars[player.carDrivingIndex].rotation * Math.PI / 180) *
-        cars[player.carDrivingIndex].speed * deltaTime;
+    // Modify forces if there is a wall and apply it to the car
+    let newRotation = Math.abs(cars[player.carDrivingIndex].rotation % 180);
+    let carPoints = [
+        [cars[player.carDrivingIndex].x, cars[player.carDrivingIndex].y],
+        [cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width, cars[player.carDrivingIndex].y],
+        [cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width, cars[player.carDrivingIndex].y + cars[player.carDrivingIndex].height],
+        [cars[player.carDrivingIndex].x, cars[player.carDrivingIndex].y + cars[player.carDrivingIndex].height],
+    ];
+
+    // Horizontal
+    let xSpeed = -Math.sin(degToRad(cars[player.carDrivingIndex].rotation)) * cars[player.carDrivingIndex].speed * deltaTime;
+    let direction = xSpeed > 0 ? 1 : -1;
+    let nearestWallDistanceX;
+
+    // Calculate the nearest wall distance on the X axis
+    if (newRotation === 0) {
+        nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(cars[player.carDrivingIndex].x, cars[player.carDrivingIndex].y,
+            cars[player.carDrivingIndex].width, cars[player.carDrivingIndex].height, direction, false);
+    } else if (newRotation === 90) {
+        nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(cars[player.carDrivingIndex].x, cars[player.carDrivingIndex].y,
+            cars[player.carDrivingIndex].height, cars[player.carDrivingIndex].width, direction, false);
+    } else if (cars[player.carDrivingIndex].speed <= 0) {
+        let rotatedPoint;
+        if (cars[player.carDrivingIndex].rotation >= 0) {
+            if (newRotation > 90) {
+                rotatedPoint = getRotatedPoint(carPoints[0][0], carPoints[0][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, false);
+
+                if (nearestWallDistanceX === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[1][0], carPoints[1][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+
+            } else {
+                rotatedPoint = getRotatedPoint(carPoints[1][0], carPoints[1][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, false);
+
+                if (nearestWallDistanceX === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[0][0], carPoints[0][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+            }
+        } else {
+            if (newRotation < 90) {
+                rotatedPoint = getRotatedPoint(carPoints[0][0], carPoints[0][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, false);
+
+                if (nearestWallDistanceX === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[1][0], carPoints[1][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+            } else {
+                rotatedPoint = getRotatedPoint(carPoints[1][0], carPoints[1][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, false);
+
+                if (nearestWallDistanceX === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[0][0], carPoints[0][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+            }
+        }
+
+        nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, false);
+    } else {
+        let rotatedPoint;
+        if (cars[player.carDrivingIndex].rotation >= 0) {
+            if (newRotation > 90) {
+                rotatedPoint = getRotatedPoint(carPoints[2][0], carPoints[2][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, false);
+
+                if (nearestWallDistanceX === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[3][0], carPoints[3][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+
+            } else {
+                rotatedPoint = getRotatedPoint(carPoints[3][0], carPoints[3][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, false);
+
+                if (nearestWallDistanceX === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[2][0], carPoints[2][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+            }
+        } else {
+            if (newRotation < 90) {
+                rotatedPoint = getRotatedPoint(carPoints[2][0], carPoints[2][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, false);
+
+                if (nearestWallDistanceX === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[3][0], carPoints[3][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+
+            } else {
+                rotatedPoint = getRotatedPoint(carPoints[3][0], carPoints[3][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, false);
+
+                if (nearestWallDistanceX === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[2][0], carPoints[2][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+            }
+        }
+
+        nearestWallDistanceX = xSpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, false);
+    }
+
+    if (nearestWallDistanceX !== null && Math.abs(xSpeed) > nearestWallDistanceX) {
+        cars[player.carDrivingIndex].speed = 0;
+        cars[player.carDrivingIndex].x += nearestWallDistanceX * direction;
+    } else {
+        // Apply the force to the car
+        cars[player.carDrivingIndex].x += xSpeed;
+    }
+
+    // Vertical
+    let ySpeed = Math.cos(degToRad(cars[player.carDrivingIndex].rotation)) * cars[player.carDrivingIndex].speed * deltaTime;
+    direction = ySpeed > 0 ? 1 : -1;
+    let nearestWallDistanceY;
+
+    // Calculate the nearest wall distance on the X axis
+    let rotatedPoint;
+    if (newRotation === 0) {
+        nearestWallDistanceY = ySpeed === 0 ? null : getNearestWallDistance(cars[player.carDrivingIndex].x, cars[player.carDrivingIndex].y,
+            cars[player.carDrivingIndex].width, cars[player.carDrivingIndex].height, direction, true);
+    } else if (newRotation === 90) {
+        nearestWallDistanceY = xSpeed === 0 ? null : getNearestWallDistance(cars[player.carDrivingIndex].x, cars[player.carDrivingIndex].y,
+            cars[player.carDrivingIndex].height, cars[player.carDrivingIndex].width, direction, true);
+    } else if (cars[player.carDrivingIndex].speed <= 0) {
+        if (cars[player.carDrivingIndex].rotation >= 0) {
+            if (newRotation > 90) {
+                rotatedPoint = getRotatedPoint(carPoints[1][0], carPoints[1][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceY = ySpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, true);
+
+                if (nearestWallDistanceY === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[0][0], carPoints[0][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+
+            } else {
+                rotatedPoint = getRotatedPoint(carPoints[0][0], carPoints[0][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceY = ySpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, true);
+
+                if (nearestWallDistanceY === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[1][0], carPoints[1][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+            }
+        } else {
+            if (newRotation < 90) {
+                rotatedPoint = getRotatedPoint(carPoints[1][0], carPoints[1][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceY = ySpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, true);
+
+                if (nearestWallDistanceY === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[0][0], carPoints[0][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+
+            } else {
+                rotatedPoint = getRotatedPoint(carPoints[0][0], carPoints[0][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceY = ySpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, true);
+
+                if (nearestWallDistanceY === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[1][0], carPoints[1][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+            }
+        }
+
+        nearestWallDistanceY = ySpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, true);
+    } else {
+        if (cars[player.carDrivingIndex].rotation >= 0) {
+            if (newRotation > 90) {
+                rotatedPoint = getRotatedPoint(carPoints[3][0], carPoints[3][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceY = ySpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, true);
+
+                if (nearestWallDistanceY === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[2][0], carPoints[2][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+
+            } else {
+                rotatedPoint = getRotatedPoint(carPoints[2][0], carPoints[2][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceY = ySpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, true);
+
+                if (nearestWallDistanceY === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[3][0], carPoints[3][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+            }
+        } else {
+            if (newRotation < 90) {
+                rotatedPoint = getRotatedPoint(carPoints[3][0], carPoints[3][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceY = ySpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, true);
+
+                if (nearestWallDistanceY === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[2][0], carPoints[2][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+
+            } else {
+                rotatedPoint = getRotatedPoint(carPoints[2][0], carPoints[2][1],
+                    cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                    cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+
+                nearestWallDistanceY = ySpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, true);
+
+                if (nearestWallDistanceY === null) {
+                    rotatedPoint = getRotatedPoint(carPoints[3][0], carPoints[3][1],
+                        cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2, cars[player.carDrivingIndex].y +
+                        cars[player.carDrivingIndex].height / 2, cars[player.carDrivingIndex].rotation);
+                }
+            }
+        }
+
+        nearestWallDistanceY = ySpeed === 0 ? null : getNearestWallDistance(rotatedPoint[0], rotatedPoint[1], 1, 1, direction, true);
+    }
+
+    if (nearestWallDistanceY !== null && Math.abs(ySpeed) > nearestWallDistanceY) {
+        cars[player.carDrivingIndex].speed = 0;
+        cars[player.carDrivingIndex].y += nearestWallDistanceY * direction;
+    } else {
+        // Apply the force to the car
+        cars[player.carDrivingIndex].y += ySpeed;
+    }
 
     // Teleport the player in the middle off the car
     player.x = cars[player.carDrivingIndex].x + cars[player.carDrivingIndex].width / 2 - PLAYER_WIDTH / 2;
@@ -362,29 +668,31 @@ function driveCar() {
  * @param width Width of the rectangle.
  * @param height Height of the rectangle.
  * @param direction The direction of the detection, -1 for left / forward, 1 for right / backward.
- * @param axis The axis of detection, false : X, true : Y
+ * @param axis The axis of detection, false : X, true : Y.
+ * @return Null if the distance isn't valid else the distance between
+ * the rectangle in parameters and the nearest wall.
  */
 function getNearestWallDistance(x, y, width, height, direction, axis) {
     let minDist = null;
-    for (let i = 0; i < MAP.length; i++) {
-        if (MAP[i].type >= MAP_TYPE_COLLISIONS[0] && MAP[i].type <= MAP_TYPE_COLLISIONS[1]) {
+    for (let element of MAP) {
+        if (element.type >= MAP_TYPE_COLLISIONS[0] && element.type <= MAP_TYPE_COLLISIONS[1]) {
             if (axis) {
                 // Vertical
-                if (direction === 1 && MAP[i].y >= y + height && x + width > MAP[i].x &&
-                    x < MAP[i].x + MAP[i].width && (MAP[i].y - y - height < minDist || minDist === null)) {
-                    minDist = MAP[i].y - y - height;
-                } else if (direction === -1 && MAP[i].y + MAP[i].height <= y && x + width > MAP[i].x &&
-                    x < MAP[i].x + MAP[i].width && (MAP[i].y + MAP[i].height - y < minDist || minDist === null)) {
-                    minDist = Math.abs(MAP[i].y + MAP[i].height - y);
+                if (direction === 1 && element.y >= y + height - 1 && x + width > element.x &&
+                    x < element.x + element.width && (element.y - y - height < minDist || minDist === null)) {
+                    minDist = element.y - y - height;
+                } else if (direction === -1 && element.y + element.height <= y + 1 && x + width > element.x &&
+                    x < element.x + element.width && (y - element.y - element.height < minDist || minDist === null)) {
+                    minDist = y - element.y - element.height;
                 }
             } else {
                 // Horizontal
-                if (direction === 1 && MAP[i].x >= x + width && y + height > MAP[i].y &&
-                    y < MAP[i].y + MAP[i].height && (MAP[i].x - x - width < minDist || minDist === null)) {
-                    minDist = MAP[i].x - x - width;
-                } else if (direction === -1 && MAP[i].x + MAP[i].width <= x && y + height > MAP[i].y &&
-                    y < MAP[i].y + MAP[i].height && (MAP[i].x + MAP[i].width - x < minDist || minDist === null)) {
-                    minDist = Math.abs(MAP[i].x + MAP[i].width - x);
+                if (direction === 1 && element.x >= x + width && y + height > element.y &&
+                    y < element.y + element.height && (element.x - x - width < minDist || minDist === null)) {
+                    minDist = element.x - x - width;
+                } else if (direction === -1 && element.x + element.width <= x && y + height > element.y &&
+                    y < element.y + element.height && (x - element.x - element.width < minDist || minDist === null)) {
+                    minDist = x - element.x - element.width;
                 }
             }
         }
