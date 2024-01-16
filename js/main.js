@@ -54,7 +54,7 @@ const CAR_RANGE = 50;
 class Player {
     x = 0;
     y = 0;
-    carDrivingIndex = 0; // -1 : no car
+    carDrivingIndex = -1; // -1 : no car
 }
 
 /**
@@ -167,7 +167,8 @@ function getRotatedPoint(x, y, centerX, centerY, rotation) {
  */
 function drawElementsInRange() {
     for (let element of MAP) {
-        if (calculateDistance(player.x, player.y, element.x, element.y) <= RENDER_DISTANCE) {
+        if (calculateDistance(player.x, player.y, element.x, element.y) <= RENDER_DISTANCE +
+            Math.sqrt(Math.pow(element.width, 2) + Math.pow(element.height, 2))) {
             // Get the texture of the element
             let color = "";
             switch (element.type) {
@@ -178,6 +179,9 @@ function drawElementsInRange() {
 
                 // With collisions
                 case 201: color = "gray"; break;
+
+                // Road
+                case 602: color = "GrayText"; break;
             }
 
             // Display the element
