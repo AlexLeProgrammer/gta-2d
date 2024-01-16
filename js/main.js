@@ -43,6 +43,7 @@ const MAP_TYPE_ROAD = [601, 800];
 
 // Cars
 const CAR_RANGE = 50;
+const ROADS_TIMES_FASTER = 2;
 
 //#endregion
 
@@ -355,18 +356,27 @@ function driveCar() {
     }
 
     // Forward
-    if (forwardPressed && !backwardPressed && cars[player.carDrivingIndex].speed > -cars[player.carDrivingIndex].maxSpeed) {
-        cars[player.carDrivingIndex].speed -= cars[player.carDrivingIndex].maxSpeed / cars[player.carDrivingIndex].frameToMaxSpeed;
+    let carOnRoad = isOnRoad(cars[player.carDrivingIndex].x, cars[player.carDrivingIndex].y,
+        cars[player.carDrivingIndex].width, cars[player.carDrivingIndex].height);
+    if (forwardPressed && !backwardPressed && ((carOnRoad && cars[player.carDrivingIndex].speed >
+        -cars[player.carDrivingIndex].maxSpeed) || (!carOnRoad  && cars[player.carDrivingIndex].speed >
+        -cars[player.carDrivingIndex].maxSpeed / ROADS_TIMES_FASTER))) {
+        cars[player.carDrivingIndex].speed -= (carOnRoad ? cars[player.carDrivingIndex].maxSpeed :
+            cars[player.carDrivingIndex].maxSpeed / ROADS_TIMES_FASTER) / cars[player.carDrivingIndex].frameToMaxSpeed;
     }
 
     // Backward
-    if (backwardPressed && !forwardPressed && cars[player.carDrivingIndex].speed < cars[player.carDrivingIndex].maxSpeed) {
-        cars[player.carDrivingIndex].speed += cars[player.carDrivingIndex].maxSpeed / cars[player.carDrivingIndex].frameToMaxSpeed;
+    if (backwardPressed && !forwardPressed && ((carOnRoad && cars[player.carDrivingIndex].speed <
+        cars[player.carDrivingIndex].maxSpeed) || (!carOnRoad  && cars[player.carDrivingIndex].speed <
+        cars[player.carDrivingIndex].maxSpeed / ROADS_TIMES_FASTER))) {
+        cars[player.carDrivingIndex].speed += (carOnRoad ? cars[player.carDrivingIndex].maxSpeed :
+            cars[player.carDrivingIndex].maxSpeed / ROADS_TIMES_FASTER) / cars[player.carDrivingIndex].frameToMaxSpeed;
     }
 
     // When we don't move, reduce speed
     // Vertical
-    if ((forwardPressed && backwardPressed) || (!forwardPressed && !backwardPressed)) {
+    if ((forwardPressed && backwardPressed) || (!forwardPressed && !backwardPressed) || (!carOnRoad && cars[player.carDrivingIndex].speed >
+        cars[player.carDrivingIndex].maxSpeed / ROADS_TIMES_FASTER)) {
         if (Math.abs(cars[player.carDrivingIndex].speed) < cars[player.carDrivingIndex].maxSpeed / cars[player.carDrivingIndex].frameToStop) {
             cars[player.carDrivingIndex].speed = 0;
         } else {
@@ -552,6 +562,27 @@ function getNearestWallDistance(x, y, width, height, direction, axis) {
     }
 
     return minDist === null ? null : minDist;
+}
+
+/**
+ * Search if the rectangle in parameters
+ * @param x Position of the rectangle in the X axis.
+ * @param y Position of the rectangle in the Y axis.
+ * @param width Width of the rectangle.
+ * @param height Height of the rectangle.
+ * @return {boolean} If the rectangle is on a road.
+ */
+function isOnRoad(x, y, width, height) {
+    let centerX = x + width / 2;
+    let centerY = y + height / 2;
+    for (let element of MAP) {
+        if (element.type >= MAP_TYPE_ROAD[0] && element.type <= MAP_TYPE_ROAD[1] &&
+        centerX > element.x && centerX < element.x + element.width &&
+        centerY > element.y && centerY < element.y + element.height) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Main function
