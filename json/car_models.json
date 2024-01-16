@@ -6,7 +6,7 @@
     "maxSpeed" : 10,
     "frameToMaxSpeed" : 500,
     "frameToStop" : 2000,
-    "rotationSpeed" : 5,
+    "rotationSpeed" : 4,
     "texture" : [
       {
         "x" : -5,
@@ -45,7 +45,7 @@
     "maxSpeed" : 15,
     "frameToMaxSpeed" : 500,
     "frameToStop" : 2000,
-    "rotationSpeed" : 2,
+    "rotationSpeed" : 3,
     "texture" : [
       {
         "x" : -5,
