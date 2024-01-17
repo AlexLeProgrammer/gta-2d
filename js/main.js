@@ -26,7 +26,7 @@ const PLAYER_FRAME_TO_MAX_SPEED = 100;
 const PLAYER_FRAME_TO_STOP = 50;
 
 // Camera
-const CAMERA_MOVE_DIVIDER = 10;
+const CAMERA_MOVE_DIVIDER = 15;
 
 const RENDER_DISTANCE = 1000; // Maximal distance where elements are rendered
 
@@ -177,6 +177,7 @@ function drawElementsInRange() {
                 case 1: color = "gray"; break;
                 case 2: color = "saddlebrown"; break;
                 case 3: color = "green"; break;
+                case 4: color = "yellow"; break;
 
                 // With collisions
                 case 201: color = "gray"; break;
@@ -628,11 +629,6 @@ function tick() {
 }
 
 //#endregion
-
-// Sort the map by the z-index of the elements
-MAP.sort((a, b) => {
-    return a.z_index - b.z_index;
-});
 
 // Start the game loop
 setInterval(tick, 0)
