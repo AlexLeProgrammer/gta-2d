@@ -1,0 +1,58 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    border: 0;
+    font-family: Inter, sans-serif;
+    font-size: 1.5rem;
+    color: white;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+canvas {
+    width: 100vw;
+    height: 100vh;
+    background-color: black;
+}
+
+#gui {
+    position: absolute;
+    width: 100vw;
+    height: 100vh;
+    padding: 20px;
+    user-select: none;
+}
+
+#palette {
+    background-color: white;
+    padding: 10px;
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    box-shadow: 0 0 30px 5px rgba(0, 0, 0, .25);
+    transform: translateX(-50%);
+    border-radius: 5px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr 1fr;
+}
+
+#palette button {
+    aspect-ratio: 1;
+    height: 30px;
+    padding: 0;
+    cursor: pointer;
+    margin: 2px;
+    border: 1px solid black;
+}
+
+#type {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin: 20px;
+}
