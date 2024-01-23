@@ -150,9 +150,6 @@ class Character {
      * Move the character and the car that he is in.
      */
     driveCar() {
-        // Get the player
-        let player = getPlayer();
-
         // Left
         if (leftPressed && !rightPressed && cars[this.carDrivingIndex].speed !== 0) {
             if (cars[this.carDrivingIndex].speed < 0) {
@@ -226,11 +223,12 @@ class Character {
 
         // Horizontal
         let xSpeed = -Math.sin(degToRad(cars[this.carDrivingIndex].rotation)) * cars[this.carDrivingIndex].speed * deltaTime;
-        let direction = xSpeed > 0 ? 1 : -1;
-        let nearestWallDistanceX;
 
         // Calculate the nearest wall distance on the X axis
         if (xSpeed !== 0) {
+            let direction = xSpeed > 0 ? 1 : -1;
+            let nearestWallDistanceX;
+
             if (newRotation === 0) {
                 nearestWallDistanceX = getNearestWallDistance(cars[this.carDrivingIndex].x, cars[this.carDrivingIndex].y,
                     cars[this.carDrivingIndex].width, cars[this.carDrivingIndex].height, direction, false);
@@ -270,25 +268,24 @@ class Character {
                     }
                 }
             }
-        } else {
-            nearestWallDistanceX = null;
-        }
 
-        if (nearestWallDistanceX !== null && Math.abs(xSpeed) > nearestWallDistanceX) {
-            cars[this.carDrivingIndex].speed = 0;
-            cars[this.carDrivingIndex].x += nearestWallDistanceX * direction;
-        } else {
-            // Apply the force to the car
-            cars[this.carDrivingIndex].x += xSpeed;
+            if (nearestWallDistanceX !== null && Math.abs(xSpeed) > nearestWallDistanceX) {
+                cars[this.carDrivingIndex].speed = 0;
+                cars[this.carDrivingIndex].x += nearestWallDistanceX * direction;
+            } else {
+                // Apply the force to the car
+                cars[this.carDrivingIndex].x += xSpeed;
+            }
         }
 
         // Vertical
         let ySpeed = Math.cos(degToRad(cars[this.carDrivingIndex].rotation)) * cars[this.carDrivingIndex].speed * deltaTime;
-        direction = ySpeed > 0 ? 1 : -1;
-        let nearestWallDistanceY;
 
         // Calculate the nearest wall distance on the Y axis
-        if (xSpeed !== 0) {
+        if (ySpeed !== 0) {
+            let direction = ySpeed > 0 ? 1 : -1;
+            let nearestWallDistanceY;
+
             if (newRotation === 0) {
                 nearestWallDistanceY = getNearestWallDistance(cars[this.carDrivingIndex].x, cars[this.carDrivingIndex].y,
                     cars[this.carDrivingIndex].width, cars[this.carDrivingIndex].height, direction, true);
@@ -328,19 +325,17 @@ class Character {
                     }
                 }
             }
-        } else {
-            nearestWallDistanceY = null;
+
+            if (nearestWallDistanceY !== null && Math.abs(ySpeed) > nearestWallDistanceY) {
+                cars[this.carDrivingIndex].speed = 0;
+                cars[this.carDrivingIndex].y += nearestWallDistanceY * direction;
+            } else {
+                // Apply the force to the car
+                cars[this.carDrivingIndex].y += ySpeed;
+            }
         }
 
-        if (nearestWallDistanceY !== null && Math.abs(ySpeed) > nearestWallDistanceY) {
-            cars[this.carDrivingIndex].speed = 0;
-            cars[this.carDrivingIndex].y += nearestWallDistanceY * direction;
-        } else {
-            // Apply the force to the car
-            cars[this.carDrivingIndex].y += ySpeed;
-        }
-
-        // Teleport the player in the middle off the car
+        // Teleport the player in the middle of the car
         this.x = cars[this.carDrivingIndex].x + cars[this.carDrivingIndex].width / 2 - PLAYER_WIDTH / 2;
         this.y = cars[this.carDrivingIndex].y + cars[this.carDrivingIndex].height / 2 - PLAYER_HEIGHT / 2;
     }
