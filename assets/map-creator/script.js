@@ -58,11 +58,22 @@ function getCellIndex(x, y) {
     return null;
 }
 
+function getBigBlockIndex(x, y) {
+    for (let i = 0; i < bigBlocks.length; i++) {
+        if (bigBlocks[0] === x && bigBlocks[1] === y) {
+            return i;
+        }
+    }
+
+    return null;
+}
+
 function placePixel(x, y) {
     let index = getCellIndex(x, y);
     if (index !== null) {
         if (selectedColor !== "#000000") {
             map[index][1] = selectedColor;
+            map[index][2] = selectedType
         } else {
             map.splice(index, 1);  
         }
@@ -106,14 +117,12 @@ if (storedMap != null) {
 
 // Loop function
 setInterval(() => {
-    //#region CALCULATE BIG BLOCKS
-
     bigBlocks = [];
     bigLineBlocks = [];
     
     // Create lines
     for (let element of map) {
-        if (!isABloc(element[0][0] - 1, element[0][1])) {
+        if (!isABloc(element[0][0] - 1, element[0][1], element[2])) {
             let endFound = false;
             let lenght = 0;
             while (!endFound) {
@@ -130,7 +139,8 @@ setInterval(() => {
     for (let i = 0; i < bigLineBlocks.length; i++) {
         let isOnTop = true;
         for (let j = 0; j < bigLineBlocks.length; j ++) {
-            if (bigLineBlocks[j][2] === bigLineBlocks[i][2] && bigLineBlocks[j][1] + 1 === bigLineBlocks[i][1] && bigLineBlocks[j][0] === bigLineBlocks[i][0]) {
+            if (bigLineBlocks[j][2] === bigLineBlocks[i][2] && bigLineBlocks[j][1] + 1 === bigLineBlocks[i][1] &&
+                bigLineBlocks[j][0] === bigLineBlocks[i][0] && bigLineBlocks[j][4] === bigLineBlocks[i][4]) {
                 isOnTop = false;
             }
         }
@@ -146,7 +156,7 @@ setInterval(() => {
         while (!endFound) {
             lenght ++;
             for (let j = bigBlocks[i][0]; j < bigBlocks[i][0] + bigBlocks[i][2]; j ++) {
-                if (!isABloc(j, bigBlocks[i][1] + lenght)) {
+                if (!isABloc(j, bigBlocks[i][1] + lenght, bigBlocks[i][4])) {
                     endFound = true;
                 }
             }
@@ -156,13 +166,11 @@ setInterval(() => {
             }
         }
         bigBlocks[i][3] = lenght;
-
-        // Store the map
-        localStorage.setItem("map", JSON.stringify(map));
     }
 
-    //#endregion
-
+    // Store the map
+    localStorage.setItem("map", JSON.stringify(map));
+    
     if((mouseLeft && shiftLeft) || mouseRight) {
         camX = mouseX + mouseCamOffsetX;
         camY = mouseY + mouseCamOffsetY;
@@ -175,18 +183,18 @@ setInterval(() => {
     canvas.height = window.innerHeight;
 
     // Draw the map
-    let startX = Math.floor(-camX / CellSize);
-    let startY = Math.floor(-camY / CellSize);
-    let endX = Math.floor((canvas.width - camX) / CellSize);
-    let endY = Math.floor((canvas.width - camY) / CellSize);
-    for (let y = startY; y <= endY; y++) {
-        for (let x = startX; x <= endX; x++) {
-            let index = getCellIndex(x, y);
-            if (index !== null) {
-                ctx.fillStyle = map[index][1];
-                ctx.fillRect(x * CellSize + camX, y * CellSize + camY, CellSize + .5, CellSize + .5);
+    for (let block of bigBlocks) {
+        for (let material of materials) {
+            if (material[1] === block[4]) {
+                ctx.fillStyle = material[0];
+                break;
             }
         }
+
+        ctx.fillRect(block[0] * CellSize + camX, block[1] * CellSize + camY, block[2] * CellSize, block[3] * CellSize);
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 5;
+        ctx.strokeRect(block[0] * CellSize + camX, block[1] * CellSize + camY, block[2] * CellSize, block[3] * CellSize);
     }
 
     // Mouse

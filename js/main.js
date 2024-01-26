@@ -28,7 +28,7 @@ const PLAYER_FRAME_TO_STOP = 50;
 // Camera
 const CAMERA_MOVE_DIVIDER = 15;
 
-const RENDER_DISTANCE = 1000; // Maximal distance where elements are rendered
+const RENDER_DISTANCE = 1000000; // Maximal distance where elements are rendered
 
 // Delta-time
 const DEFAULT_FPS = 60;
@@ -45,6 +45,9 @@ const MAP_TYPE_ROAD = [601, 800];
 const CAR_RANGE = 50;
 const ROADS_TIMES_FASTER = 2;
 
+// NPC cars
+const ROADS_DIST_RIGHT = 70;
+
 //#endregion
 
 //#region class
@@ -55,20 +58,24 @@ const ROADS_TIMES_FASTER = 2;
 class Character {
     // Properties
     playerCharacter;
-    x = 0;
-    y = 0;
+    x;
+    y;
     direction = 0;
     horizontalSpeed = 0;
     verticalSpeed = 0;
-    carDrivingIndex = -1; // -1 : no car
+    carDrivingIndex = null; // null : no car
 
     // Functions
     /**
      * Constructor
-     * @param playerCharacter Define if this character is the player
+     * @param playerCharacter Define if this character is the player.
+     * @param x Coordinate of the character in the X axis.
+     * @param y Coordinate of the character in the Y axis.
      */
-    constructor(playerCharacter = false) {
+    constructor(playerCharacter = false, x = 0, y = 0) {
         this.playerCharacter = playerCharacter;
+        this.x = x;
+        this.y = y;
     }
 
     /**
@@ -190,7 +197,7 @@ class Character {
         ];
 
         // Forward
-        let carOnRoad = isRectangleOnRoad(rotatedCarPoints);
+        let carOnRoad = isOnRoad(rotatedCarPoints);
         if (forwardPressed && !backwardPressed && ((carOnRoad && cars[this.carDrivingIndex].speed >
             -cars[this.carDrivingIndex].maxSpeed) || (!carOnRoad  && cars[this.carDrivingIndex].speed >
             -cars[this.carDrivingIndex].maxSpeed / ROADS_TIMES_FASTER))) {
@@ -380,12 +387,34 @@ class Car {
     }
 }
 
+class RoadPoint {
+    x;
+    y;
+    edge;
+    roadIndex;
+
+    /**
+     * Constructor
+     * @param x Coordinate of the point in the X axis.
+     * @param y Coordinate of the point in the X axis.
+     * @param edge If the point is the first or the last point of his road : true, else : false.
+     * @param roadIndex Index of the road in range that the point is in.
+     */
+    constructor(x = 0, y = 0, edge = false, roadIndex = null) {
+        this.x = x;
+        this.y = y;
+        this.edge = edge;
+        this.roadIndex = roadIndex;
+    }
+
+}
+
 //#endregion
 
 //#region Global-variables
 
-// Character
-let charactersList = [new Character(true)];
+// Characters
+let charactersList = [];
 
 
 // Inputs
@@ -452,6 +481,22 @@ function getRotatedPoint(x, y, centerX, centerY, rotation) {
 }
 
 /**
+ * Determinate if the rectangle in parameters is in the range of the render distance.
+ * @param x Coordinate of the rectangle in the X axis.
+ * @param y Coordinate of the rectangle in the Y axis.
+ * @param width Width of the rectangle.
+ * @param height Height of the rectangle.
+ * @return {boolean} If the rectangle is in the range of the render distance : true, else : false.
+ */
+function isInRange(x, y, width, height) {
+    // Get the player
+    let player = getPlayer();
+
+    return calculateDistance(player.x, player.y, x, y) <= RENDER_DISTANCE +
+       Math.sqrt(Math.pow(width, 2) + Math.pow(height, 2));
+}
+
+/**
  * Return the player.
  * @return {Character} Player.
  */
@@ -470,13 +515,9 @@ function getPlayer() {
  * Display all the elements in the range of the render distance.
  */
 function drawElementsInRange() {
-    // Get the player
-    let player = getPlayer();
-
     for (let element of MAP) {
         // Calculate if the element is in range
-        if (calculateDistance(player.x, player.y, element.x, element.y) <= RENDER_DISTANCE +
-            Math.sqrt(Math.pow(element.width, 2) + Math.pow(element.height, 2))) {
+        if (isInRange(element.x, element.y, element.width, element.height)) {
             // Get the texture of the element
             let color = "";
             switch (element.type) {
@@ -515,7 +556,7 @@ function drawCharacters() {
     CTX.fillStyle = "black";
 
     for (let character of charactersList) {
-        if (character.carDrivingIndex === -1) {
+        if (character.carDrivingIndex === null) {
             CTX.fillRect(character.x - cameraX, character.y - cameraY, PLAYER_WIDTH, PLAYER_HEIGHT);
         }
     }
@@ -529,7 +570,7 @@ function drawCarsInRange() {
     let player = getPlayer();
 
     for (let car of cars) {
-        if (calculateDistance(player.x, player.y, car.x, car.y) <= RENDER_DISTANCE) {
+        if (isInRange(car.x, car.y, car.width, car.height)) {
             if (car.rotation !== 0) {
                 // Rotate / translate the canvas
                 CTX.translate(-cameraX, -cameraY);
@@ -587,7 +628,7 @@ function getInTheNearestCar() {
 }
 
 /**
- * Get the index of the nearest wall in the X axis.
+ * Get the nearest wall distance.
  * @param x Position of the rectangle in the X axis.
  * @param y Position of the rectangle in the Y axis.
  * @param width Width of the rectangle.
@@ -600,7 +641,8 @@ function getInTheNearestCar() {
 function getNearestWallDistance(x, y, width, height, direction, axis) {
     let minDist = null;
     for (let element of MAP) {
-        if (element.type >= MAP_TYPE_COLLISIONS[0] && element.type <= MAP_TYPE_COLLISIONS[1]) {
+        if (element.type >= MAP_TYPE_COLLISIONS[0] && element.type <= MAP_TYPE_COLLISIONS[1] &&
+        isInRange(element.x, element.y, element.width, element.height)) {
             if (axis) {
                 // Vertical
                 if (direction === 1 && element.y >= y + height - 1 && x + width > element.x &&
@@ -627,18 +669,36 @@ function getNearestWallDistance(x, y, width, height, direction, axis) {
 }
 
 /**
+ * Search if the point in parameters is on a road and return the road index.
+ * @param x Th location of the point in the X axis.
+ * @param y Th location of the point in the Y axis.
+ * @return {number} If the point is on a road : null else, the index of the road on the map.
+ */
+function getRoadIndex(x, y) {
+    for (let i = 0; i < MAP.length; i++) {
+        if (MAP[i].type >= MAP_TYPE_ROAD[0] && MAP[i].type <= MAP_TYPE_ROAD[1] &&
+            x > MAP[i].x && x < MAP[i].x + MAP[i].width &&
+            y > MAP[i].y && y < MAP[i].y + MAP[i].height) {
+            return i;
+        }
+    }
+
+    return null;
+}
+
+/**
  * Search if the points in parameters are on a road.
  * @param points The list of 4 points to know if there is on a road.
- * @return {boolean} If the rectangle is on a road.
+ * @return {Boolean} If all the 4 point are on a road : true, else : false.
  */
-function isRectangleOnRoad(points) {
+function isOnRoad(points) {
     let onRoad = [false, false, false, false];
     for (let i = 0; i < points.length; i++) {
-        for (let element of MAP) {
-            if (element.type >= MAP_TYPE_ROAD[0] && element.type <= MAP_TYPE_ROAD[1] &&
-                points[i][0] > element.x && points[i][0] < element.x + element.width &&
-                points[i][1] > element.y && points[i][1] < element.y + element.height) {
-                onRoad[i] = true;
+        for (let j = 0; j < MAP.length; j++) {
+            if (MAP[j].type >= MAP_TYPE_ROAD[0] && MAP[j].type <= MAP_TYPE_ROAD[1] &&
+                points[i][0] > MAP[j].x && points[i][0] < MAP[j].x + MAP[j].width &&
+                points[i][1] > MAP[j].y && points[i][1] < MAP[j].y + MAP[j].height) {
+                onRoad[i] = j;
                 break;
             }
         }
@@ -708,7 +768,7 @@ function setPlayerDirection() {
  */
 function moveCharacters() {
     for (let character of charactersList) {
-        if (character.carDrivingIndex === -1) {
+        if (character.carDrivingIndex === null) {
             character.move();
         } else {
             character.driveCar();
@@ -716,7 +776,124 @@ function moveCharacters() {
     }
 }
 
-// Main function
+/**
+ * Get the roads in the range of the render distance.
+ * @return {*[]} The list of road in range.
+ */
+function getRoadsInRange() {
+    let roads = [];
+    for (let element of MAP) {
+        if (element.type >= MAP_TYPE_ROAD[0] && element.type <= MAP_TYPE_ROAD[1] &&
+        isInRange(element.x, element.y, element.width, element.height)) {
+            roads.push(element);
+        }
+    }
+
+    return roads;
+}
+
+/**
+ * Get the points of the road that bots have to follow.
+ * @param roads The roads that we want to get the points.
+ * @param direction False : left and forward, true : right and backward.
+ * @return {*[]} An array of the points of the roads in parameters.
+ */
+function getRoadsPoints(roads, direction) {
+    let points = [];
+    for (let i = 0; i < roads.length; i++) {
+        // Add default points
+        if (roads[i].width >= roads[i].height) {
+            for (let j = 0; j <= roads[i].width; j++) {
+                if (direction) {
+                    if (isInRange(roads[i].x + j, roads[i].y + roads[i].height - ROADS_DIST_RIGHT, 1, 1)) {
+                        points.push(new RoadPoint(roads[i].x + j, roads[i].y + roads[i].height - ROADS_DIST_RIGHT,
+                            j === 0 || j === roads[i].width, i));
+                    }
+                } else {
+                    if (isInRange(roads[i].x + j, roads[i].y + ROADS_DIST_RIGHT, 1, 1)) {
+                        points.push(new RoadPoint(roads[i].x + j, roads[i].y + ROADS_DIST_RIGHT,
+                            j === 0 || j === roads[i].width, i));
+                    }
+                }
+            }
+        } else {
+            for (let j = 0; j <= roads[i].height; j++) {
+                if (direction) {
+                    if (isInRange(roads[i].x + roads[i].width - ROADS_DIST_RIGHT,roads[i].y + j, 1, 1)) {
+                        points.push(new RoadPoint(roads[i].x + roads[i].width - ROADS_DIST_RIGHT, roads[i].y + j,
+                            j === 0 || j === roads[i].height, i));
+                    }
+                } else {
+                    if (isInRange(roads[i].x + ROADS_DIST_RIGHT, roads[i].y + j, 1, 1)) {
+                        points.push(new RoadPoint(roads[i].x + ROADS_DIST_RIGHT, roads[i].y + j,
+                            j === 0 || j === roads[i].height, i));
+                    }
+                }
+            }
+        }
+    }
+
+    // Add joins
+    for (let point of points) {
+        if (point.edge) {
+            // Find the nearest point in another road
+            let minDist = null;
+            let pointAtMinDist = null;
+            for (let point2 of points) {
+                if (point2.roadIndex !== null) {
+                    let dist = calculateDistance(point.x, point.y, point2.x, point2.y);
+
+                    // Check if the two points are in different roads and if the 2 roads are stuck
+                    if (point.roadIndex !== point2.roadIndex &&
+                        (
+                            !(roads[point.roadIndex].x + roads[point.roadIndex].width < roads[point2.roadIndex].x ||
+                                roads[point2.roadIndex].x + roads[point2.roadIndex].width < roads[point.roadIndex].x) &&
+                            !(roads[point.roadIndex].y + roads[point.roadIndex].height < roads[point2.roadIndex].y ||
+                                roads[point2.roadIndex].y + roads[point2.roadIndex].height < roads[point.roadIndex].y)
+                        ) && (dist < minDist || minDist === null)) {
+                        minDist = dist;
+                        pointAtMinDist = point2;
+                    }
+                }
+            }
+
+            if (minDist !== null) {
+                // Determinate direction of the line in the X axis
+                let xDirection = 0;
+                if (pointAtMinDist.x > point.x) {
+                    xDirection = 1;
+                } else if (pointAtMinDist.x < point.x) {
+                    xDirection = -1;
+                }
+
+                // Determinate direction of the line in the Y axis
+                let yDirection = 0;
+                if (pointAtMinDist.y > point.y) {
+                    yDirection = 1;
+                } else if (pointAtMinDist.y < point.y) {
+                    yDirection = -1;
+                }
+
+                // Add the line
+                if ((xDirection === 0 && yDirection !== 0) || (yDirection === 0 && xDirection !== 0)) {
+                    for (let x = 0, y = 0; ((Math.abs(pointAtMinDist.x - (point.x + x)) > 0 &&
+                        xDirection !== 0) || xDirection === 0) && ((Math.abs(pointAtMinDist.y - (point.y + y)) > 0 &&
+                        yDirection !== 0) || yDirection === 0); x += xDirection, y += yDirection) {
+                        points.push(new RoadPoint(point.x + x, point.y + y));
+                    }
+                }
+            }
+        }
+    }
+
+    // TODO : Delete useless points
+
+    return points;
+}
+
+/**
+ * Main function, it is executed every frame.
+ */
 function tick() {
     // Delta-time
     deltaTime = (performance.now() - lastTick) / (1000 / DEFAULT_FPS);
@@ -739,11 +916,11 @@ function tick() {
     drawCarsInRange()
 
     // Get the nearest car
-    if (interactKeyPressed && player.carDrivingIndex === -1) {
+    if (interactKeyPressed && player.carDrivingIndex === null) {
         getInTheNearestCar();
     } else if (interactKeyPressed) {
         cars[player.carDrivingIndex].speed = 0;
-        player.carDrivingIndex = -1;
+        player.carDrivingIndex = null;
     }
 
     // Move the characters
@@ -752,6 +929,19 @@ function tick() {
     // Draw the characters
     drawCharacters();
 
+    // Draw the points of the roads
+    let points = getRoadsPoints(getRoadsInRange(), true);
+    for (let point of points) {
+        CTX.fillStyle = "red";
+        CTX.fillRect(point.x - cameraX, point.y - cameraY, 1, 1);
+    }
+
+    points = getRoadsPoints(getRoadsInRange(), false);
+    for (let point of points) {
+        CTX.fillStyle = "green";
+        CTX.fillRect(point.x - cameraX, point.y - cameraY, 1, 1);
+    }
+
     // Reset interacting value
     interactKeyPressed = false;
 }
@@ -759,7 +949,7 @@ function tick() {
 //#endregion
 
 // Start the game loop
-setInterval(tick, 0)
+setInterval(tick);
 
 //#region Inputs
 
