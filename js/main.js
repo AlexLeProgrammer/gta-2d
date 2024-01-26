@@ -566,9 +566,6 @@ function drawCharacters() {
  * Draw all the cars in the range of the render distance.
  */
 function drawCarsInRange() {
-    // Get the player
-    let player = getPlayer();
-
     for (let car of cars) {
         if (isInRange(car.x, car.y, car.width, car.height)) {
             if (car.rotation !== 0) {
@@ -886,9 +883,24 @@ function getRoadsPoints(roads, direction) {
         }
     }
 
-    // TODO : Delete useless points
-
     return points;
+}
+
+/**
+ * Search if there is a point located at the same coordinate as the point in parameters.
+ * @param x Coordinate of the point in the X axis.
+ * @param y Coordinate of the point in the Y axis.
+ * @param points The list of point that we want to search in.
+ * @return {boolean} If there is a point : true, else : false.
+ */
+function isAPoint(x, y, points) {
+    for (let point of points) {
+        if (point.x === x && point.y === y) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -941,6 +953,8 @@ function tick() {
         CTX.fillStyle = "green";
         CTX.fillRect(point.x - cameraX, point.y - cameraY, 1, 1);
     }
+
+    console.log(deltaTime);
 
     // Reset interacting value
     interactKeyPressed = false;
